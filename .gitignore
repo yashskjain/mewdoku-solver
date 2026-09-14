@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Local debug uploads (never commit user photos)
+last_upload.png
+uploads/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

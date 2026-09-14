@@ -1,0 +1,4 @@
+[theme]
+# Design tokens: warm cat-brand orange, follows OS light/dark automatically.
+primaryColor = "#C2410C"
+font = "sans serif"
