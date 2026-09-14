@@ -1,9 +1,10 @@
 """Mewdoku solver web app: upload a board photo, get the cat placement."""
 
-APP_VERSION = "1.0"
+APP_VERSION = "1.1"
 
 import base64
 import io
+import os
 import cv2
 import numpy as np
 import streamlit as st
@@ -151,10 +152,26 @@ def steps_html(has_photo, has_board, has_solution):
     return f'<div class="steps">{"".join(pills)}</div>'
 
 
+def cleanup_disk_uploads():
+    """Remove any legacy on-disk uploads. App is in-memory only, so disk
+    must stay empty — no stacking, no cross-user leaks on hosted servers."""
+    for name in ("last_upload.png",):
+        try:
+            if os.path.exists(name):
+                os.remove(name)
+        except OSError:
+            pass
+
+
+# Defensive: clear leftovers from older versions on each session start.
+cleanup_disk_uploads()
+
+
 def clear_results():
     """A new (or removed) file invalidates results from the previous one."""
     for key in ("regions", "cats", "detected_n", "photo_bytes", "solve_error"):
         st.session_state.pop(key, None)
+    cleanup_disk_uploads()
 
 
 def reset():
@@ -204,12 +221,12 @@ if regions is None and cats is None:
 
 bgr = None
 if uploaded is not None:
-    st.session_state["photo_bytes"] = uploaded.getvalue()
-    try:
-        with open("last_upload.png", "wb") as f:
-            f.write(uploaded.getvalue())
-    except OSError:
-        pass
+    # In-memory only: never write user photos to disk, so nothing stacks up
+    # on the server and users never see each other's uploads.
+    # Skip re-storing after a solve — Solve already dropped the raw bytes.
+    if st.session_state.get("cats") is None:
+        st.session_state["photo_bytes"] = uploaded.getvalue()
+    cleanup_disk_uploads()
     photo = np.frombuffer(uploaded.getvalue(), np.uint8)
     bgr = cv2.imdecode(photo, cv2.IMREAD_COLOR)
     if bgr is None:
@@ -304,6 +321,11 @@ with bar[1]:
         else:
             st.session_state["cats"] = solution
             st.session_state["solve_error"] = None
+            # Auto-cleanup once solved: drop raw upload bytes + any disk
+            # leftovers. Rendered boards stay in session for display/download;
+            # "Solve another" fully resets the uploader.
+            st.session_state.pop("photo_bytes", None)
+            cleanup_disk_uploads()
         st.rerun()
 with bar[2]:
     st.download_button("⬇️ Download solution", data=dl_data,
